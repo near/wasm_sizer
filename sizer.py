@@ -38,7 +38,7 @@ DESIGN_EXPORT = {'fillcolor': 'grey',
 
 DESIGN_MARKED = {'fillcolor': 'red'}
 
-def visualize_insns(functions, show=True, save=False,
+def visualize_insns(functions, show=True, save=True,
                     out_filename=OUT_INSN,
                     fontsize=8):
     import numpy as np
