@@ -1,13 +1,15 @@
 #!/usr/local/bin/python3
+import argparse
 import os
 
-from octopus.arch.wasm.disassembler import WasmDisassembler
-from octopus.arch.wasm.analyzer import WasmModuleAnalyzer
 from octopus.arch.wasm.cfg import WasmCFG, CFGGraph
 from graphviz import Digraph
 
 DIR = os.path.dirname(os.path.realpath(__file__))
-FILE = DIR + "/data/opt.wasm"
+DEFAULT_FILE = DIR + "/data/opt.wasm"
+
+OUT_INSN = "insn"
+OUT_FLOW = "flow"
 
 _groups = {0x00: 'Control',
            0x1A: 'Parametric',
@@ -37,7 +39,7 @@ DESIGN_EXPORT = {'fillcolor': 'grey',
 DESIGN_MARKED = {'fillcolor': 'red'}
 
 def visualize_insns(functions, show=True, save=False,
-                    out_filename="wasm_func_analytic.png",
+                    out_filename=OUT_INSN,
                     fontsize=8):
     import numpy as np
     import matplotlib.pyplot as plt
@@ -107,7 +109,7 @@ def enum_func_name_call_indirect(functions):
     func_name = list(set(func_name))
     return func_name
 
-def visualize_flow(cfg, filename="wasm_call_graph_octopus.gv", marked={}):
+def visualize_flow(cfg, filename=OUT_FLOW, marked={}):
         nodes, edges = cfg.get_functions_call_edges()
 
         g = Digraph(filename, filename=filename)
@@ -169,15 +171,37 @@ def visualize_flow(cfg, filename="wasm_call_graph_octopus.gv", marked={}):
 
         g.render(filename, view=True)
 
-with open(FILE, 'rb') as f:
-    module_bytecode = f.read()
+def process_file(file, count, do_insn, do_flow):
+    with open(file, 'rb') as f:
+        module_bytecode = f.read()
+    cfg = WasmCFG(module_bytecode)
+    largest_functions = sorted(cfg.functions, key=lambda func: len(func.instructions), reverse=True)
+    hogs = dict(map(lambda func: (func.name, len(func.instructions)), largest_functions[:count]))
+    print(hogs)
+    if do_insn:
+        visualize_insns(largest_functions[:count])
 
-cfg = WasmCFG(module_bytecode)
-count = 30
-largest_functions = sorted(cfg.functions, key=lambda func: len(func.instructions), reverse=True)
-#visualize_insns(largest_functions[:count])
+    if do_flow:
+        visualize_flow(cfg, marked=hogs)
 
-hogs = dict(map(lambda func: (func.name, len(func.instructions)), largest_functions[:count]))
-print(hogs)
-visualize_flow(cfg, marked=hogs)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--flow',
+                        action='store_true',
+                        default=True,
+                        help='Show control flow between functions, largest marked red')
+    parser.add_argument('--instructions',
+                        action='store_true',
+                        default=False,
+                        help='Show instructions in largest functions')
+    parser.add_argument('--count',
+                        default=30,
+                        help='How many biggest functions take into account')
+    parser.add_argument('--input',
+                        default=DEFAULT_FILE,
+                        help='WASM file to analyze')
+    args = parser.parse_args()
+    if args.instructions:
+       args.flow = False
+    process_file(args.input, int(args.count), args.instructions, args.flow)
