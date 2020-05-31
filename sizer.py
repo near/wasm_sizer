@@ -174,12 +174,10 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True):
                     fillcolor = DESIGN_IMPORT.get('fillcolor')
                     shape = DESIGN_IMPORT.get('shape')
                     style = DESIGN_IMPORT.get('style')
-                    c.node(node_name, label=label, fillcolor=fillcolor, shape=shape, style=style)
                 elif node in export_list:
                     fillcolor = DESIGN_EXPORT.get('fillcolor')
                     shape = DESIGN_EXPORT.get('shape')
                     style = DESIGN_EXPORT.get('style')
-                    c.node(node_name, label=label, fillcolor=fillcolor, shape=shape, style=style)
 
                 if node in marked:
                     fillcolor = DESIGN_MARKED.get('fillcolor')
@@ -188,7 +186,8 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True):
                     shape = "hexagon"
 
                 if node in call_indirect_list:
-                    style = "dashed"
+                    style = "filled,dashed"
+
                 c.node(node_name, label=label, fillcolor=fillcolor, shape=shape, style=style)
 
             # check if multiple same edges
