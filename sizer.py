@@ -109,7 +109,19 @@ def enum_func_name_call_indirect(functions):
     func_name = list(set(func_name))
     return func_name
 
-def visualize_flow(cfg, filename=OUT_FLOW, marked={}):
+def bfs(visited, graph, node):
+  queue = []
+  visited[node] = 1
+  queue.append(node)
+
+  while queue:
+    s = queue.pop(0)
+    for child in graph[s]:
+      if child not in visited:
+        visited[child] = 1
+        queue.append(child)
+
+def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True):
         nodes, edges = cfg.get_functions_call_edges()
 
         g = Digraph(filename, filename=filename)
@@ -121,12 +133,32 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}):
             import_list = [p[0] for p in cfg.analyzer.func_prototypes if p[3] == 'import']
             call_indirect_list = enum_func_name_call_indirect(cfg.functions)
 
+            only_show = {}
+            if only_relevant:
+                # Build transposed graph, and add all the nodes reachable from
+                # the marked nodes to only_show. Also include all imports and exports.
+                only_show = {}
+                transposed_edges = {}
+                for node in nodes:
+                    transposed_edges[node] = []
+                for edge in edges:
+                    current = transposed_edges.get(edge.node_to)
+                    current.append(edge.node_from)
+                # Do BFS.
+                for m in marked:
+                    bfs(only_show, transposed_edges, m)
+                for n in export_list: only_show[n] = 1
+                for n in import_list: only_show[n] = 1
+
             try:
                 indirect_target = [cfg.analyzer.func_prototypes[index][0] for index in cfg.analyzer.elements[0].get('elems')]
             except IndexError:
                 indirect_target = []
             # create all the graph nodes (function name)
             for idx, node in enumerate(nodes):
+                if only_relevant and not node in only_show:
+                    continue
+
                 # name graph bubble
                 node_name = node
                 # default style value
@@ -167,11 +199,14 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}):
                 label = None
                 if count > 1:
                     label = str(count)
+                if only_relevant:
+                    if not (edge.node_from in only_show and edge.node_to in only_show):
+                        continue
                 c.edge(edge.node_from, edge.node_to, label=label)
 
         g.render(filename, view=True)
 
-def process_file(file, count, do_insn, do_flow):
+def process_file(file, count, do_insn, do_flow, full_flow):
     with open(file, 'rb') as f:
         module_bytecode = f.read()
     cfg = WasmCFG(module_bytecode)
@@ -182,7 +217,7 @@ def process_file(file, count, do_insn, do_flow):
         visualize_insns(largest_functions[:count])
 
     if do_flow:
-        visualize_flow(cfg, marked=hogs)
+        visualize_flow(cfg, marked=hogs, only_relevant=not full_flow)
 
 
 if __name__ == "__main__":
@@ -198,10 +233,14 @@ if __name__ == "__main__":
     parser.add_argument('--count',
                         default=30,
                         help='How many biggest functions take into account')
+    parser.add_argument('--full_graph',
+                        action='store_true',
+                        default=False,
+                        help='Show full call graph, or only relevant part')
     parser.add_argument('--input',
                         default=DEFAULT_FILE,
                         help='WASM file to analyze')
     args = parser.parse_args()
     if args.instructions:
        args.flow = False
-    process_file(args.input, int(args.count), args.instructions, args.flow)
+    process_file(args.input, int(args.count), args.instructions, args.flow, args.full_graph)

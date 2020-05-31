@@ -2,12 +2,9 @@ Finds reasons of bloat in the WebAssembly binaries.
 
 ### Prerequisites
 
-Install Octopus from https://github.com/pventuzelo/octopus with `python3 setup.py install`.
-Works OK on macOS with python3 installed from brew.
+Install dependencies:
 
-Then install couple more libs:
-
-    /usr/local/bin/pip3 install numpy matplotlib
+    /usr/local/bin/pip3 install octopus numpy matplotlib
     brew install graphviz
 
 ### Running
