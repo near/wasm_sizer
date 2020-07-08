@@ -1,15 +1,18 @@
-#!/usr/local/bin/python3
+#!/usr/bin/env python3
 import argparse
 import os
 
 from octopus.arch.wasm.cfg import WasmCFG, CFGGraph
 from graphviz import Digraph
+from wasm import decode_module, SEC_GLOBAL, SEC_ELEMENT, SEC_DATA, SEC_TYPE, SEC_IMPORT, SEC_FUNCTION, SEC_TABLE, \
+    SEC_MEMORY, SEC_EXPORT, SEC_START, SEC_CODE
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_FILE = DIR + "/data/opt.wasm"
 
 OUT_INSN = "insn"
 OUT_FLOW = "flow"
+OUT_SECTIONS = "sections"
 
 _groups = {0x00: 'Control',
            0x1A: 'Parametric',
@@ -205,7 +208,55 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True):
 
         g.render(filename, view=True)
 
-def process_file(file, count, do_insn, do_flow, full_flow):
+def visualize_sections(file, out_filename = OUT_SECTIONS):
+    with open(file, 'rb') as raw:
+        raw = raw.read()
+
+    mod_iter = iter(decode_module(raw))
+    header, header_data = next(mod_iter)
+    sections = []
+    sizes = []
+    labels = []
+    explode = []
+    for cur_sec, cur_sec_data in mod_iter:
+        name = {
+            SEC_TYPE: "TYPE",
+            SEC_IMPORT: "IMPORT",
+            SEC_FUNCTION: "FUNCTION",
+            SEC_TABLE: "TABLE",
+            SEC_MEMORY: "MEMORY",
+            SEC_GLOBAL: "GLOBAL",
+            SEC_EXPORT: "EXPORT",
+            SEC_START: "START",
+            SEC_ELEMENT: "ELEMENT",
+            SEC_CODE: "CODE",
+            SEC_DATA: "DATA"
+        }.get(cur_sec_data.id, "UNKNOWN")
+        length = cur_sec_data.get_decoder_meta()['lengths']['payload']
+        print(name, length)
+        sections.append( { 'name': name, 'length': length})
+        labels.append(name + ' [' + str(length) + ']')
+        sizes.append(length)
+        if name != 'CODE':
+            explode.append(0.1)
+        else:
+            explode.append(0.0)
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    fig1, ax1 = plt.subplots(figsize = (10, 10))
+    colors = iter(plt.cm.gist_rainbow(np.linspace(0, 1, len(sections))))
+    ax1.pie(sizes, explode=explode, autopct='%1.0f%%',
+        colors = colors, shadow=False, startangle=90)
+    ax1.axis('equal')
+    ax1.legend(labels, loc= 'upper right')
+    plt.title('Size split by sections for \n' + file, fontsize = 24)
+    plt.tight_layout()
+    plt.savefig(out_filename)
+    plt.show()
+
+def process_file(file, count, do_insn, do_flow, full_flow, do_sections):
     with open(file, 'rb') as f:
         module_bytecode = f.read()
     cfg = WasmCFG(module_bytecode)
@@ -218,6 +269,8 @@ def process_file(file, count, do_insn, do_flow, full_flow):
     if do_flow:
         visualize_flow(cfg, marked=hogs, only_relevant=not full_flow)
 
+    if do_sections:
+        visualize_sections(file)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -239,7 +292,11 @@ if __name__ == "__main__":
     parser.add_argument('--input',
                         default=DEFAULT_FILE,
                         help='WASM file to analyze')
+    parser.add_argument('--sections',
+                        action='store_true',
+                        default=False,
+                        help='Show sections histogram')
     args = parser.parse_args()
-    if args.instructions:
+    if args.instructions or args.sections:
        args.flow = False
-    process_file(args.input, int(args.count), args.instructions, args.flow, args.full_graph)
+    process_file(args.input, int(args.count), args.instructions, args.flow, args.full_graph, args.sections)
