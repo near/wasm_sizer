@@ -124,10 +124,11 @@ def bfs(visited, graph, node):
         visited[child] = 1
         queue.append(child)
 
-def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True):
+def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True, show=True):
         nodes, edges = cfg.get_functions_call_edges()
-
-        g = Digraph(filename, filename=filename)
+        name = filename
+        filename = name + "-" + OUT_FLOW
+        g = Digraph(name, filename=filename)
         g.attr(rankdir='LR')
 
         with g.subgraph(name='global') as c:
@@ -206,9 +207,9 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True):
                         continue
                 c.edge(edge.node_from, edge.node_to, label=label)
 
-        g.render(filename, view=True)
+        g.render(filename, view=show)
 
-def visualize_sections(file, out_filename = OUT_SECTIONS):
+def visualize_sections(file, out_filename = OUT_SECTIONS, show=True):
     with open(file, 'rb') as raw:
         raw = raw.read()
 
@@ -254,9 +255,16 @@ def visualize_sections(file, out_filename = OUT_SECTIONS):
     plt.title('Size split by sections for \n' + file, fontsize = 24)
     plt.tight_layout()
     plt.savefig(out_filename)
-    plt.show()
+    if show:
+      plt.show()
 
-def process_file(file, count, do_insn, do_flow, full_flow, do_sections):
+def process_file(file, count, do_insn, do_flow, full_flow, do_sections, out_dir = None, show=True):
+    name = os.path.basename(file).split(".")[0]
+    parent = os.path.dirname(file)
+    new_dir = out_dir if out_dir is not None else os.path.join(parent, name)
+    filename = os.path.join(new_dir, name)
+    if not os.path.exists(new_dir):
+        os.mkdir(new_dir)
     with open(file, 'rb') as f:
         module_bytecode = f.read()
     cfg = WasmCFG(module_bytecode)
@@ -264,13 +272,13 @@ def process_file(file, count, do_insn, do_flow, full_flow, do_sections):
     hogs = dict(map(lambda func: (func.name, len(func.instructions)), largest_functions[:count]))
     print(hogs)
     if do_insn:
-        visualize_insns(largest_functions[:count])
+        visualize_insns(largest_functions[:count], out_filename=filename, show=show)
 
     if do_flow:
-        visualize_flow(cfg, marked=hogs, only_relevant=not full_flow)
+        visualize_flow(cfg, marked=hogs, only_relevant=not full_flow, filename=(filename), show=show)
 
     if do_sections:
-        visualize_sections(file)
+        visualize_sections(file, filename, show=show)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -296,7 +304,14 @@ if __name__ == "__main__":
                         action='store_true',
                         default=False,
                         help='Show sections histogram')
+    parser.add_argument('--out_dir',
+                        default=None,
+                        help='Directory to write generated data files')
+    parser.add_argument('--silent',
+                        action='store_true',
+                        default=False,
+                        help="Don't open generated images")
     args = parser.parse_args()
     if args.instructions or args.sections:
        args.flow = False
-    process_file(args.input, int(args.count), args.instructions, args.flow, args.full_graph, args.sections)
+    process_file(args.input, int(args.count), args.instructions, args.flow, args.full_graph, args.sections, out_dir=args.out_dir, show=not args.silent)
