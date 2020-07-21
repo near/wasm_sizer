@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import argparse
 import os
-
+from itanium_demangler import parse
 from octopus.arch.wasm.cfg import WasmCFG, CFGGraph
 from graphviz import Digraph
 from wasm import decode_module, SEC_GLOBAL, SEC_ELEMENT, SEC_DATA, SEC_TYPE, SEC_IMPORT, SEC_FUNCTION, SEC_TABLE, \
     SEC_MEMORY, SEC_EXPORT, SEC_START, SEC_CODE
+
+
+def demangle(name):
+    return str(parse(name))
 
 DIR = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_FILE = DIR + "/data/opt.wasm"
@@ -172,7 +176,7 @@ def visualize_flow(cfg, filename=OUT_FLOW, marked={}, only_relevant=True, show=T
                 label = None
 
                 if node in marked:
-                    label = node + "[" + str(marked[node]) + "]"
+                    label = demangle(node) + "[" + str(marked[node]) + "]"
 
                 if node in import_list:
                     fillcolor = DESIGN_IMPORT.get('fillcolor')

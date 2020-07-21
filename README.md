@@ -4,8 +4,12 @@ Finds reasons of bloat in the WebAssembly binaries.
 
 Install dependencies:
 
-    /usr/local/bin/pip3 install octopus numpy matplotlib
+    pip3 install octopus numpy matplotlib itanium-demangler
     brew install graphviz
+
+On Linux machines with evince PDF viewer use this command to allow zooming in.
+
+    gsettings set org.gnome.Evince page-cache-size 1000
 
 ### Running
 
